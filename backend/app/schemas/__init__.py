@@ -1,3 +1,3 @@
-from backend.app.schemas.chat import ChatMessageRequest
+from backend.app.schemas.chat import ChatRequest, ChatResponse
 
-__all__ = ["ChatMessageRequest"]
+__all__ = ["ChatRequest", "ChatResponse"]

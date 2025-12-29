@@ -1,14 +1,14 @@
 from pydantic import BaseModel, Field
+from typing import Optional
+from uuid import UUID
 
-class ChatMessageRequest(BaseModel):
+class ChatRequest(BaseModel):
     "Request schema for chat message"
-    message:str = Field(min_length=1,
-                        max_length=1000,
-                        description="Message content")
+    message:str 
+    conversation_id: Optional[UUID] = None
 
 
-
-class ChatMessageResponse(BaseModel):
+class ChatResponse(BaseModel):
     "Response schema for chat message"
-    
-    
+    conversion_id: UUID
+    reply : str
