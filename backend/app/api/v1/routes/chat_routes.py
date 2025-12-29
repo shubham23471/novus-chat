@@ -27,9 +27,9 @@ async def chat_message(request:ChatRequest):
 
     # 1. Load or create conversation
     if request.conversation_id:
-        print("here1")
-        conversation = conversation_store.get(request.conversation_id)
-        if not conversation is None:
+        conversation_id = request.conversation_id
+        conversation = conversation_store.get(conversation_id)
+        if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
     else:
         conversation_id = uuid4()
@@ -53,6 +53,6 @@ async def chat_message(request:ChatRequest):
 
     #5. Return response
     response = ChatResponse(
-        conversion_id=conversation_id,
+        conversation_id=conversation_id,
         reply=assitant_text)
     return response

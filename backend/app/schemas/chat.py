@@ -10,5 +10,5 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     "Response schema for chat message"
-    conversion_id: UUID
+    conversation_id: UUID
     reply : str
