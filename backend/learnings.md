@@ -35,3 +35,13 @@ This keeps it reusable for:
 - WebSockets
 - SSE
 - Batch jobs
+
+- Create a steaming end-point. LMstudio also support streaming. 
+
+---
+# Context Window Safety
+
+## simple context trimming strategy
+
+`keep system message + last N messages`
+

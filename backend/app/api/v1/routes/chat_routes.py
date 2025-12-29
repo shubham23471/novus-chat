@@ -8,7 +8,20 @@ from fastapi import HTTPException
 from backend.app.schemas import ChatRequest, ChatResponse
 from backend.app.core.conversation_store import conversation_store
 from fastapi.responses import StreamingResponse
+from typing import List
 
+def trim_converstaion(messages: List[ChatMessage], 
+                      max_messages: int = 12) -> List[ChatMessage]:
+    """Trim conversation to the last `max_messages` messages, keeping the system message."""
+
+    system_message = messages[0]
+    rest_messages = messages[1:]
+
+    if len(rest_messages) <= max_messages:
+        return messages
+    
+    trimmed_messages = rest_messages[-max_messages:]
+    return [system_message] + trimmed_messages
 
 load_dotenv()
 API_URL = os.getenv("LM_STUDIO_API_URL")
@@ -44,7 +57,8 @@ async def chat_message(request:ChatRequest):
 
     # 3. call LLM
     try : 
-        assitant_text = await llm_client.generate_chat_completion(messages=conversation)
+        assitant_text = await llm_client.generate_chat_completion(
+                                            messages=trim_converstaion(conversation, max_messages=12))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
     
@@ -79,7 +93,7 @@ async def stream_chat(request:ChatRequest):
     async def token_generator():
         assistant_text = ""
 
-        async for token in llm_client.stream_chat_completion(conversation):
+        async for token in llm_client.stream_chat_completion(trim_converstaion(conversation, max_messages=12)):
             assistant_text += token
             yield token
         
