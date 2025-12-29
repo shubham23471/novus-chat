@@ -9,6 +9,7 @@ from backend.app.schemas import ChatRequest, ChatResponse
 from backend.app.core.conversation_store import conversation_store
 from fastapi.responses import StreamingResponse
 from typing import List
+from backend.app.core.locks import get_conversation_lock
 
 def trim_converstaion(messages: List[ChatMessage], 
                       max_messages: int = 12) -> List[ChatMessage]:
@@ -51,26 +52,28 @@ async def chat_message(request:ChatRequest):
         conversation = [SYSTEM_MESSAGE]
         conversation_store[conversation_id] = conversation
 
-    # 2. Append user message to conversation
-    user_message = ChatMessage(role="user", content=request.message)
-    conversation.append(user_message)
+    lock = get_conversation_lock(conversation_id)
+    async with lock:
+        # 2. Append user message to conversation
+        user_message = ChatMessage(role="user", content=request.message)
+        conversation.append(user_message)
 
-    # 3. call LLM
-    try : 
-        assitant_text = await llm_client.generate_chat_completion(
-                                            messages=trim_converstaion(conversation, max_messages=12))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        # 3. call LLM
+        try : 
+            assitant_text = await llm_client.generate_chat_completion(
+                                                messages=trim_converstaion(conversation, max_messages=12))
+        except RuntimeError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        
 
-    # 4. Append assistant message to conversation
-    assistant_message = ChatMessage(role="assistant", content=assitant_text)
-    conversation.append(assistant_message)
+        # 4. Append assistant message to conversation
+        assistant_message = ChatMessage(role="assistant", content=assitant_text)
+        conversation.append(assistant_message)
 
-    #5. Return response
-    response = ChatResponse(
-        conversation_id=conversation_id,
-        reply=assitant_text)
+        #5. Return response
+        response = ChatResponse(
+            conversation_id=conversation_id,
+            reply=assitant_text)
     return response
 
 @router.post("/chat/stream")
@@ -86,19 +89,23 @@ async def stream_chat(request:ChatRequest):
         conversation = [SYSTEM_MESSAGE]
         conversation_store[conversation_id] = conversation
 
-    # 2. Append user message to conversation
-    user_message = ChatMessage(role="user", content=request.message)
-    conversation.append(user_message)
 
-    async def token_generator():
-        assistant_text = ""
+    lock = get_conversation_lock(conversation_id)
+    async with lock:
 
-        async for token in llm_client.stream_chat_completion(trim_converstaion(conversation, max_messages=12)):
-            assistant_text += token
-            yield token
-        
-        # persist assistant message after stream completes
-        conversation.append(ChatMessage(role='assistant', content=assistant_text))
+        # 2. Append user message to conversation
+        user_message = ChatMessage(role="user", content=request.message)
+        conversation.append(user_message)
+
+        async def token_generator():
+            assistant_text = ""
+
+            async for token in llm_client.stream_chat_completion(trim_converstaion(conversation, max_messages=12)):
+                assistant_text += token
+                yield token
+            
+            # persist assistant message after stream completes
+            conversation.append(ChatMessage(role='assistant', content=assistant_text))
 
     return StreamingResponse(token_generator(), 
                                 media_type='text/plain')
