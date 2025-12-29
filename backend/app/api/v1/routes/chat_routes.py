@@ -10,6 +10,8 @@ from backend.app.core.conversation_store import conversation_store
 from fastapi.responses import StreamingResponse
 from typing import List
 from backend.app.core.locks import get_conversation_lock
+from backend.app.core.rate_limit import allow_request
+from fastapi import Request
 
 def trim_converstaion(messages: List[ChatMessage], 
                       max_messages: int = 12) -> List[ChatMessage]:
@@ -39,11 +41,16 @@ router = APIRouter()
 
 
 @router.post("/chat/message", response_model=ChatResponse)
-async def chat_message(request:ChatRequest):
+async def chat_message(request: Request, chat_request: ChatRequest):
+
+    # rate limit check
+    client_ip = request.client.host
+    if not allow_request(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
     # 1. Load or create conversation
-    if request.conversation_id:
-        conversation_id = request.conversation_id
+    if chat_request.conversation_id:
+        conversation_id = chat_request.conversation_id
         conversation = conversation_store.get(conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
@@ -55,7 +62,7 @@ async def chat_message(request:ChatRequest):
     lock = get_conversation_lock(conversation_id)
     async with lock:
         # 2. Append user message to conversation
-        user_message = ChatMessage(role="user", content=request.message)
+        user_message = ChatMessage(role="user", content=chat_request.message)
         conversation.append(user_message)
 
         # 3. call LLM
@@ -77,10 +84,15 @@ async def chat_message(request:ChatRequest):
     return response
 
 @router.post("/chat/stream")
-async def stream_chat(request:ChatRequest):
+async def stream_chat(request: Request, chat_request:ChatRequest):
+    # rate limit check
+    client_ip = request.client.host
+    if not allow_request(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    
     # 1. Load or create conversation
-    if request.conversation_id:
-        conversation_id = request.conversation_id
+    if chat_request.conversation_id:
+        conversation_id = chat_request.conversation_id
         conversation = conversation_store.get(conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
@@ -94,7 +106,7 @@ async def stream_chat(request:ChatRequest):
     async with lock:
 
         # 2. Append user message to conversation
-        user_message = ChatMessage(role="user", content=request.message)
+        user_message = ChatMessage(role="user", content=chat_request.message)
         conversation.append(user_message)
 
         async def token_generator():
