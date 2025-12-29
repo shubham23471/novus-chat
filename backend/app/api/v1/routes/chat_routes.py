@@ -7,6 +7,8 @@ from uuid import uuid4
 from fastapi import HTTPException
 from backend.app.schemas import ChatRequest, ChatResponse
 from backend.app.core.conversation_store import conversation_store
+from fastapi.responses import StreamingResponse
+
 
 load_dotenv()
 API_URL = os.getenv("LM_STUDIO_API_URL")
@@ -56,3 +58,33 @@ async def chat_message(request:ChatRequest):
         conversation_id=conversation_id,
         reply=assitant_text)
     return response
+
+@router.post("/chat/stream")
+async def stream_chat(request:ChatRequest):
+    # 1. Load or create conversation
+    if request.conversation_id:
+        conversation_id = request.conversation_id
+        conversation = conversation_store.get(conversation_id)
+        if conversation is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+    else:
+        conversation_id = uuid4()
+        conversation = [SYSTEM_MESSAGE]
+        conversation_store[conversation_id] = conversation
+
+    # 2. Append user message to conversation
+    user_message = ChatMessage(role="user", content=request.message)
+    conversation.append(user_message)
+
+    async def token_generator():
+        assistant_text = ""
+
+        async for token in llm_client.stream_chat_completion(conversation):
+            assistant_text += token
+            yield token
+        
+        # persist assistant message after stream completes
+        conversation.append(ChatMessage(role='assistant', content=assistant_text))
+
+    return StreamingResponse(token_generator(), 
+                                media_type='text/plain')

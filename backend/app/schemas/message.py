@@ -9,5 +9,4 @@ class ChatMessage(BaseModel):
     """Schema for chat message"""
     role : Role
     content: str = Field(min_length=1,
-                         max_length=1000,
                          description="Message content")

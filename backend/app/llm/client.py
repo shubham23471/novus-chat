@@ -1,7 +1,7 @@
 import httpx
 from backend.app.schemas.message import ChatMessage
-from typing import List
-
+from typing import List, AsyncGenerator
+import json
 
 
 class LMStudioClient:
@@ -38,16 +38,37 @@ class LMStudioClient:
         return data["choices"][0]["message"]["content"]
 
 
-# if __name__ == "__main__":
-    # import os
-    # import asyncio
-    # from dotenv import load_dotenv
+    async def stream_chat_completion(self, 
+                                     message: List[ChatMessage],
+                                     max_token: int = 256
+                                     ) -> AsyncGenerator[str, None]:
+        """Stream chat completion from LM Studio API"""
+        payload = {
+                    "model": self.model,
+                    "messages": [m.model_dump() for m in message],
+                    "max_tokens": max_token,
+                    "temperature": 0.7,
+                    "stream": True
+                }
+        try: 
+            async with httpx.AsyncClient(timeout=None) as client:
+                response = await client.post(
+                    f"{self.api_url}/chat/completions",
+                    json=payload,
+                    headers=self.HEADER
+                )
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data = line.removeprefix("data: ")
+                    if data == "[DONE]":
+                        break
 
-    # load_dotenv()
+                    chunk = json.loads(data)
+                    delta = chunk["choices"][0]["delta"]
+                    if "content" in delta:
+                        yield delta["content"]
+        except httpx.RequestError as exc:
+            raise RuntimeError(f"An error occurred while requesting {exc.request.url!r}.") from exc
 
-    # API_URL = os.getenv("LM_STUDIO_API_URL")
-    # LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL")
-
-    # lm_client = LMStudioClient(api_url=API_URL, model=LM_STUDIO_MODEL)
-    # response = asyncio.run(lm_client.generate_text(prompt="Hello, how are you?"))
-    # print(response)
