@@ -120,3 +120,9 @@ Solution:
 - per IP 
 - Per minute
 - In-memory
+
+
+--- 
+# Test1: Two simultaneous messages don’t corrupt state
+
+`pip install pytest pytest-asyncio httpx`

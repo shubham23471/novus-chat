@@ -60,7 +60,7 @@ async def chat_message(request: Request, chat_request: ChatRequest):
         conversation_store[conversation_id] = conversation
 
     lock = get_conversation_lock(conversation_id)
-    async with lock:
+    with lock:
         # 2. Append user message to conversation
         user_message = ChatMessage(role="user", content=chat_request.message)
         conversation.append(user_message)
@@ -103,7 +103,7 @@ async def stream_chat(request: Request, chat_request:ChatRequest):
 
 
     lock = get_conversation_lock(conversation_id)
-    async with lock:
+    with lock:
 
         # 2. Append user message to conversation
         user_message = ChatMessage(role="user", content=chat_request.message)
