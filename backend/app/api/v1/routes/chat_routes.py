@@ -9,9 +9,10 @@ from backend.app.schemas import ChatRequest, ChatResponse
 from backend.app.core.conversation_store import conversation_store
 from fastapi.responses import StreamingResponse
 from typing import List
-from backend.app.core.locks import get_conversation_lock
+from backend.app.core.redis_lock import conversation_lock
 from backend.app.core.rate_limit import allow_request
 from fastapi import Request
+from backend.db.redis_client import RedisClient
 
 def trim_converstaion(messages: List[ChatMessage], 
                       max_messages: int = 12) -> List[ChatMessage]:
@@ -36,8 +37,9 @@ SYSTEM_MESSAGE = ChatMessage(role="system",
                              content="You are a helpful assistant.")
 
 
-
 router = APIRouter()
+redis_client = RedisClient.get_client()  # Initialize Redis client
+
 
 
 @router.post("/chat/message", response_model=ChatResponse)
@@ -59,8 +61,7 @@ async def chat_message(request: Request, chat_request: ChatRequest):
         conversation = [SYSTEM_MESSAGE]
         conversation_store[conversation_id] = conversation
 
-    lock = get_conversation_lock(conversation_id)
-    with lock:
+    async with conversation_lock(redis_client, conversation_id):
         # 2. Append user message to conversation
         user_message = ChatMessage(role="user", content=chat_request.message)
         conversation.append(user_message)
@@ -102,8 +103,7 @@ async def stream_chat(request: Request, chat_request:ChatRequest):
         conversation_store[conversation_id] = conversation
 
 
-    lock = get_conversation_lock(conversation_id)
-    with lock:
+    async with conversation_lock(redis_client, conversation_id):
 
         # 2. Append user message to conversation
         user_message = ChatMessage(role="user", content=chat_request.message)

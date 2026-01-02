@@ -126,3 +126,43 @@ Solution:
 # Test1: Two simultaneous messages don’t corrupt state
 
 `pip install pytest pytest-asyncio httpx`
+
+
+
+---
+# Persistence, Redis, Auth, Observability & Deployment Mental Model
+- Persist chats across restarts (Postgres)
+- Use Redis for locks + rate limiting
+- Support real users (auth boundary)
+- Be observable (logs + basic metrics)
+- Be deployable without architectural rewrites
+
+User flow at this point
+```
+Client
+  │
+FastAPI
+  ├─ Auth
+  ├─ Rate limit (Redis)
+  ├─ Conversation logic
+  │
+  ├─ Redis (locks, hot state)
+  ├─ Postgres (durable history)
+  │
+  └─ LLM Provider (LM Studio / OpenAI / self-hosted)
+
+```
+
+## Redis 
+The goal is use Redis for Locks and rate limiting and Not for storage and history. 
+
+Goal: ONLY One request can write to a converstaion at a time even across multiple FastAPI workers. 
+
+
+# Docker Commands
+
+```bash 
+
+1. docker compose up -d # d: deamon mode
+2. docker compose down -v  # The -v flag deletes the data volumes!
+```

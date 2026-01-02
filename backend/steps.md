@@ -1,0 +1,1 @@
+# Steps to setup Redis and Postgress on docker
