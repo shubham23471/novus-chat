@@ -3,5 +3,7 @@ httpx
 python-dotenv
 pytest 
 pytest-asyncio 
-httpx
 redis
+supabase>=2.0.0
+pydantic[email]
+uvicorn
